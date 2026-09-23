@@ -1,8 +1,8 @@
 import json
 import random
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Optional
+from paths import DB_PATH
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, Session
@@ -18,8 +18,6 @@ def get_n_designs():
 # DATABASE
 # --------------------------------------------
 
-# anchored to this file so the DB location doesn't depend on the process's cwd
-DB_PATH = Path(__file__).resolve().parent / "allocator.db"
 engine = create_engine(f"sqlite:///{DB_PATH}")
 
 
@@ -37,6 +35,7 @@ class Allocation(Base):
     participant_id: Mapped[str] = mapped_column(primary_key=True)
     group: Mapped[str]
     design_id: Mapped[int]
+    handedness: Mapped[str]
     experimenter_id: Mapped[Optional[str]] = mapped_column(default=None)
     raw_data_filename: Mapped[Optional[str]] = mapped_column(default=None)
     raw_data: Mapped[Optional[bytes]] = mapped_column(default=None)
@@ -152,6 +151,8 @@ def _migrate_allocations():
             conn.execute(text("ALTER TABLE allocations ADD COLUMN raw_data BLOB"))
         if "experimenter_id" not in columns:
             conn.execute(text("ALTER TABLE allocations ADD COLUMN experimenter_id TEXT"))
+        if "handedness" not in columns:
+            conn.execute(text("ALTER TABLE allocations ADD COLUMN handedness TEXT"))
 
 
 _migrate_design_state()
@@ -186,13 +187,14 @@ Base.metadata.create_all(engine)
 # DATABASE FUNCTIONS
 # --------------------------------------------
 
-def save_allocation(participant_id, group, design_id, experimenter_id=None):
+def save_allocation(participant_id, group, design_id,handedness=None, experimenter_id=None):
     with Session(engine) as session:
 
         allocation = Allocation(
             participant_id=participant_id,
             group=group,
             design_id=design_id,
+            handedness=handedness,
             experimenter_id=experimenter_id,
         )
 
@@ -206,7 +208,11 @@ def get_allocation(participant_id):
         if allocation is None:
             return None
 
-        return allocation.group, allocation.design_id
+    return {
+    "group": allocation.group,
+    "design_id": allocation.design_id,
+    "handedness": allocation.handedness,
+}
 
 
 def get_raw_data(participant_id):
@@ -463,6 +469,7 @@ def get_all_allocations():
                 "participant_id": row.participant_id,
                 "group": row.group,
                 "design_id": row.design_id,
+                "handedness": row.handedness,
                 "experimenter_id": row.experimenter_id,
                 "raw_data_filename": row.raw_data_filename,
             }

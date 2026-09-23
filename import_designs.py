@@ -9,15 +9,17 @@ already have been handed out to a participant.
 """
 import csv
 import hashlib
+from paths import MATERIAL_DIR
 from pathlib import Path
 import re
 
 from sqlalchemy.orm import Session
 
 from database import DesignTrial, SeqFile, TrialParam, engine, record_data_version
-from seq_files import GROUP_LABELS, PROPRIO_SEQ_DIR
 
-MATERIAL_DIR = Path(__file__).resolve().parent / "material"
+# MATERIAL_DIR is now imported from paths.py
+PROPRIO_SEQ_DIR = MATERIAL_DIR
+GROUP_LABELS = {"A": "active", "P": "passive"}
 SEQ_FILENAME_PATTERN = re.compile(r"^design_(\d+)_(active|passive)\.seq$")
 
 class ImportConflict(Exception):

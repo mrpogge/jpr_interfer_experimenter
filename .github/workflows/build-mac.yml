@@ -1,0 +1,39 @@
+name: Build macOS application
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build application
+        run: |
+          pyinstaller \
+            --windowed \
+            --name JPR_Experimenter \
+            app.py
+
+      - name: Upload macOS application
+        uses: actions/upload-artifact@v4
+        with:
+          name: JPR_Experimenter-macOS
+          path: dist/JPR_Experimenter.app

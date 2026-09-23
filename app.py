@@ -74,7 +74,7 @@ restore_group_block(load_pending_groups())
 for group in ("A", "P"):
     restore_design_pool(group, load_pending_designs(group))
 
-current_allocation = {"participant_id": None, "group": None, "design_id": None}
+current_allocation = {"participant_id": None, "group": None, "design_id": None, "handedness": None}
 current_experimenter = {"username": None, "is_admin": False}
 
 
@@ -99,10 +99,9 @@ def run_allocation():
 
     existing = get_allocation(participant_id)
     if existing is not None:
-        group, design_id = existing
         set_status(f"Participant {participant_id} already exists - showing existing allocation.", COLOR_WARNING)
-        log_event(current_experimenter["username"], participant_id, "view_existing", f"group={group}, design_id={design_id}")
-        display_allocation(participant_id, group, design_id)
+        log_event(current_experimenter["username"], participant_id, "view_existing", f"group={existing['group']}, design_id={existing['design_id']}")
+        display_allocation(existing["participant_id"], existing["group"], existing["design_id"], handedness=existing["handedness"])
         return
 
     #generate allocation
@@ -112,8 +111,13 @@ def run_allocation():
         set_status("No design data loaded yet. Please ask the admin to upload it in Settings.", COLOR_WARNING)
         return
 
+    handedness = handedness_entry.get()
+    if handedness not in ("Right", "Left"):
+        set_status("Please select a valid handedness", COLOR_WARNING)
+        return
+
     #store allocation
-    save_allocation(participant_id, group, design_id, experimenter_id=current_experimenter["username"])
+    save_allocation(participant_id, group, design_id, handedness=handedness, experimenter_id=current_experimenter["username"])
     save_pending_groups(get_pending_group_block())
     save_pending_designs(group, get_pending_design_pool(group))
     log_event(current_experimenter["username"], participant_id, "allocate", f"group={group}, design_id={design_id}")
@@ -122,16 +126,18 @@ def run_allocation():
     set_status(f"Allocation of the new participant {participant_id} was successful.", COLOR_SUCCESS)
 
     #display allocation
-    display_allocation(participant_id, group, design_id)
+    display_allocation(participant_id, group, design_id, handedness=handedness)
 
-def display_allocation(participant_id, group, design_id):
+def display_allocation(participant_id, group, design_id, handedness=None):
     participant_value.config(text=participant_id)
     group_value.config(text=group)
     design_value.config(text=design_id)
+    handedness_value.config(text=handedness)
 
     current_allocation["participant_id"] = participant_id
     current_allocation["group"] = group
     current_allocation["design_id"] = design_id
+    current_allocation["handedness"] = handedness
     download_button.config(state=tk.NORMAL)
     upload_raw_button.config(state=tk.NORMAL)
 
@@ -338,7 +344,7 @@ def export_all_allocations():
     try:
         with open(dest, "w", newline="", encoding="utf-8") as f:
             writer = csv_module.DictWriter(
-                f, fieldnames=["participant_id", "group", "design_id", "experimenter_id", "raw_data_filename"]
+                f, fieldnames=["participant_id", "group", "design_id", "handedness", "experimenter_id", "raw_data_filename"]
             )
             writer.writeheader()
             writer.writerows(rows)
@@ -686,6 +692,17 @@ ttk.Label(entry_row, text="Participant ID:").pack(side=tk.LEFT)
 participant_entry = ttk.Entry(entry_row, width=22)
 participant_entry.pack(side=tk.LEFT, padx=(10, 0))
 
+ttk.Label(entry_row, text="Handedness:").pack(side=tk.LEFT, padx=(30, 0))
+
+handedness_entry = ttk.Combobox(
+    entry_row,
+    values=("Right", "Left"),
+    state="readonly",
+    width=10,
+)
+handedness_entry.pack(side=tk.LEFT, padx=(10, 0))
+handedness_entry.set("Right")
+
 action_frame = ttk.Frame(entry_card)
 action_frame.pack(fill=tk.X, pady=(15, 0))
 
@@ -736,6 +753,7 @@ def _result_field(parent, column, label):
 participant_value = _result_field(result_grid, 0, "Participant")
 group_value = _result_field(result_grid, 1, "Group")
 design_value = _result_field(result_grid, 2, "Design")
+handedness_value = _result_field(result_grid, 3, "Handedness")
 
 #--------------------------------------------
 # TRIAL SEQUENCE TABLE

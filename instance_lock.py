@@ -1,8 +1,7 @@
 """Prevents two copies of the allocator from running against the same DB at once."""
 import sys
-from pathlib import Path
+from paths import LOCK_PATH
 
-LOCK_PATH = Path(__file__).resolve().parent / ".instance.lock"
 _lock_file = None
 
 
