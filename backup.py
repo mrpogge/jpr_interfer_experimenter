@@ -10,5 +10,5 @@ def backup_db():
         return
     
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    shutil.copyfile(DB_PATH, BACKUP_DIR / f"allocator_{timestamp}.db")
+    date = datetime.now().strftime("%Y%m%d")
+    shutil.copyfile(DB_PATH, BACKUP_DIR / f"allocator_{date}.db")

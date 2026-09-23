@@ -101,7 +101,7 @@ def run_allocation():
     if existing is not None:
         set_status(f"Participant {participant_id} already exists - showing existing allocation.", COLOR_WARNING)
         log_event(current_experimenter["username"], participant_id, "view_existing", f"group={existing['group']}, design_id={existing['design_id']}")
-        display_allocation(existing["participant_id"], existing["group"], existing["design_id"], handedness=existing["handedness"])
+        display_allocation(participant_id, existing["group"], existing["design_id"], handedness=existing["handedness"])
         return
 
     #generate allocation
@@ -140,6 +140,7 @@ def display_allocation(participant_id, group, design_id, handedness=None):
     current_allocation["handedness"] = handedness
     download_button.config(state=tk.NORMAL)
     upload_raw_button.config(state=tk.NORMAL)
+    download_template_button.config(state=tk.NORMAL)
 
     export_participant(participant_id)
     refresh_data_status()
@@ -355,6 +356,103 @@ def export_all_allocations():
     log_event(current_experimenter["username"], None, "export_all_allocations", dest)
     settings_status.config(text=f"Exported {len(rows)} allocation row(s) to {dest}.")
 
+def export_data_template():
+    participant_id = current_allocation["participant_id"]
+    group = current_allocation["group"]
+    design_id = current_allocation["design_id"]
+    handedness = current_allocation["handedness"]
+
+    if participant_id is None:
+        messagebox.showerror(
+            "No participant selected",
+            "Please select a participant first.",
+        )
+        return
+
+    dest = filedialog.asksaveasfilename(
+        initialfile=f"{participant_id}_data_template.xlsx",
+        defaultextension=".xlsx",
+        filetypes=[("Excel files", "*.xlsx")],
+    )
+    if not dest:
+        return
+
+    trials = get_design_trials(design_id)
+
+    columns = [
+        "participant_id",
+        "group",
+        "design_id",
+        "handedness",
+        "run_order",
+        "timing",
+        "interference",
+        "movement_trial_id",
+        "start",
+        "target",
+        "amplitude",
+        "speed",
+    ]
+
+    try:
+        from openpyxl import Workbook
+
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Data"
+
+        worksheet.append(columns)
+
+        for trial in trials:
+            worksheet.append([
+                participant_id,
+                group,
+                design_id,
+                handedness,
+                trial["run_order"],
+                trial["timing"],
+                trial["interference"],
+                trial["movement_trial_id"],
+                trial["start"],
+                trial["target"],
+                trial["amplitude"],
+                trial["speed"],
+            ])
+
+        worksheet.freeze_panes = "A2"
+        worksheet.auto_filter.ref = worksheet.dimensions
+
+        for column_cells in worksheet.columns:
+            max_length = max(
+                len(str(cell.value)) if cell.value is not None else 0
+                for cell in column_cells
+            )
+            worksheet.column_dimensions[
+                column_cells[0].column_letter
+            ].width = min(max_length + 2, 30)
+
+        workbook.save(dest)
+
+    except OSError as e:
+        messagebox.showerror("Could not save file", str(e))
+        return
+
+    except Exception as e:
+        messagebox.showerror("Could not create Excel file", str(e))
+        return
+
+    log_event(
+        current_experimenter["username"],
+        participant_id,
+        "export_data_template",
+        dest,
+    )
+
+    set_status(
+        f"Downloaded data template for participant {participant_id}.",
+        COLOR_SUCCESS,
+    )
+    
 def save_database_copy():
     dest = filedialog.asksaveasfilename(
         initialfile="allocator_backup.db",
@@ -794,6 +892,11 @@ data_status_value.pack(side=tk.LEFT, padx=(15, 0))
 
 download_raw_button = ttk.Button(data_row, text="Download Raw Data", command=download_raw_data, state=tk.DISABLED)
 download_raw_button.pack(side=tk.LEFT, padx=(10, 0))
+
+download_template_button = ttk.Button(data_row,text="Download Data Template",command=export_data_template,state = tk.DISABLED)
+download_template_button.pack(side=tk.LEFT, padx=(10, 0))
+
+
 #--------------------------------------------
 # SETTINGS: UPLOAD DESIGN files
 #--------------------------------------------
@@ -833,6 +936,7 @@ ttk.Button(progress_card, text="Refresh", command=refresh_progress).pack(anchor=
 export_card = ttk.LabelFrame(settings_scroll_frame, text="Export Data", padding=15)
 export_card.pack(fill=tk.X, pady=(15, 0))
 ttk.Button(export_card, text="Export All Allocations to CSV", command=export_all_allocations).pack(anchor="w")
+
 
 db_backup_card = ttk.LabelFrame(settings_scroll_frame, text="Database Backup", padding=15)
 db_backup_card.pack(fill=tk.X, pady=(15, 0))
